@@ -1,11 +1,12 @@
 # poke_scraper
 
-Ce script télécharge les images des Pokémon depuis Bulbapedia et les envoie dans un bucket S3 AWS.
+Ce script télécharge les images des Pokémon depuis Bulbapedia et le clone de ce repo github dans EC2 et les envoie dans un bucket S3 AWS.
 
 ## Prérequis
 
 - Python 3.7+
-- Un bucket S3 nommé `bucket-pokemon2` avec la politique adaptée
+- une instance EC2 avec le role adaptée
+- Un bucket S3 nommé `bucket-pokemon2`
 - Les identifiants AWS configurés (`aws configure`)
 
 ## Installation
@@ -19,6 +20,8 @@ pip install -r requirements.txt
 ## Utilisation
 
 ```bash
+git clone https://github.com/Mohellibi/Pokescrap
+cd /Pokescrap
 python poke_scraper.py --bucket bucket-pokemon2 --prefix images --limit 10
 ```
 
