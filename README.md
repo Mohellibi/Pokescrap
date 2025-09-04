@@ -33,3 +33,4 @@ python poke_scraper.py --bucket bucket-pokemon2 --prefix images --limit 10
 
 - Le script respecte la politique AWS fournie.
 - Les images sont stockées sous le préfixe `images/` dans le bucket.
+- et sont disponible en publiques https://bucket-pokemon2.s3.eu-west-3.amazonaws.com/images/0003-.png
