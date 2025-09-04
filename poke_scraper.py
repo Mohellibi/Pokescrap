@@ -71,7 +71,6 @@ def upload_to_s3(bucket, key, data, public=True):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--bucket", required=True, help="Target S3 bucket name")
-    parser.add_argument("--prefix", default="images/national-dex", help="S3 key prefix")
     parser.add_argument("--limit", type=int, default=None, help="Limit number of Pokémon (for testing)")
     args = parser.parse_args()
 
@@ -92,7 +91,8 @@ def main():
         resp = requests.get(img_url)
         resp.raise_for_status()
         filename = f"{dex:04d}-{name}{os.path.splitext(urlparse(img_url).path)[-1]}"
-        s3_key = f"{args.prefix}/{filename}"
+        # Force le préfixe "images/" pour respecter la politique AWS
+        s3_key = f"images/{filename}"
 
         if upload_to_s3(args.bucket, s3_key, resp.content):
             logging.info("Uploaded to s3://%s/%s", args.bucket, s3_key)
