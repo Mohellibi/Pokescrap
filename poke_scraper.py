@@ -56,11 +56,14 @@ def get_pokemon_image(url):
         return src
     return None
 
-def upload_to_s3(bucket, key, data, public=True):
+def upload_to_s3(bucket, key, data, public=False):
+    if bucket != "bucket-pokemon2":
+        raise ValueError("Only bucket-pokemon2 is allowed")
+    if not key.startswith("images/"):
+        raise ValueError("Key must start with 'images/'")
+
     s3 = boto3.client("s3")
     extra_args = {"ContentType": "image/png"}
-    if public:
-        extra_args["ACL"] = "public-read"
     try:
         s3.put_object(Bucket=bucket, Key=key, Body=data, **extra_args)
         return True
@@ -68,17 +71,10 @@ def upload_to_s3(bucket, key, data, public=True):
         logging.error("Failed to upload %s: %s", key, e)
         return False
 
-def sanitize_filename(name):
-    """Nettoie le nom pour un usage sûr dans les noms de fichiers."""
-    # Remplace les caractères spéciaux par des tirets
-    name = re.sub(r'[^\w\s-]', '', name)
-    # Remplace les espaces par des tirets
-    name = re.sub(r'[-\s]+', '-', name)
-    return name.strip('-')
-
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--bucket", required=True, help="Target S3 bucket name")
+    parser.add_argument("--bucket", default="bucket-pokemon2", help="Target S3 bucket name")
+    parser.add_argument("--prefix", default="images", help="S3 key prefix")
     parser.add_argument("--limit", type=int, default=None, help="Limit number of Pokémon (for testing)")
     args = parser.parse_args()
 
@@ -98,12 +94,8 @@ def main():
 
         resp = requests.get(img_url)
         resp.raise_for_status()
-        
-        # Utilise le nom assaini pour le fichier
-        safe_name = sanitize_filename(name)
-        ext = os.path.splitext(urlparse(img_url).path)[-1] or '.png'
-        filename = f"{dex:04d}-{safe_name}{ext}"
-        s3_key = f"images/{filename}"
+        filename = f"{dex:04d}-{name}{os.path.splitext(urlparse(img_url).path)[-1]}"
+        s3_key = f"{args.prefix}/{filename}"
 
         if upload_to_s3(args.bucket, s3_key, resp.content):
             logging.info("Uploaded to s3://%s/%s", args.bucket, s3_key)
