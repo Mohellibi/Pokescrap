@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# poke_scraper.py
+# poke_scraper_ec2.py
 import argparse
 import os
 import time
@@ -9,6 +9,8 @@ from urllib.parse import urljoin, urlparse
 
 import requests
 from bs4 import BeautifulSoup
+import boto3
+from botocore.exceptions import BotoCoreError, ClientError
 
 BASE = "https://bulbapedia.bulbagarden.net"
 LIST_URL = BASE + "/wiki/List_of_Pok%C3%A9mon_by_National_Pok%C3%A9dex_number"
@@ -54,18 +56,31 @@ def get_pokemon_image(url):
         return src
     return None
 
-def download_image(img_url, filename):
-    resp = requests.get(img_url)
-    resp.raise_for_status()
-    with open(filename, "wb") as f:
-        f.write(resp.content)
+def upload_to_s3(bucket, key, data, public=True):
+    s3 = boto3.client("s3")
+    extra_args = {"ContentType": "image/png"}
+    if public:
+        extra_args["ACL"] = "public-read"
+    try:
+        s3.put_object(Bucket=bucket, Key=key, Body=data, **extra_args)
+        return True
+    except (BotoCoreError, ClientError) as e:
+        logging.error("Failed to upload %s: %s", key, e)
+        return False
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--bucket", required=True, help="Target S3 bucket name")
+    parser.add_argument("--prefix", default="images/national-dex", help="S3 key prefix")
+    parser.add_argument("--limit", type=int, default=None, help="Limit number of Pokémon (for testing)")
     args = parser.parse_args()
 
-    os.makedirs("downloads", exist_ok=True)
     pokemons = get_pokemon_list()
+
+    if args.limit:
+        pokemons = pokemons[:args.limit]
+
+    logging.info("Found %d Pokémon entries", len(pokemons))
 
     for dex, name, url in pokemons:
         logging.info("Processing #%04d %s", dex, name)
@@ -73,10 +88,14 @@ def main():
         if not img_url:
             logging.warning("No image for %s", name)
             continue
-        ext = os.path.splitext(urlparse(img_url).path)[-1] or ".png"
-        filename = f"downloads/{dex:04d}-{name}{ext}"
-        download_image(img_url, filename)
-        logging.info("Saved %s", filename)
+
+        resp = requests.get(img_url)
+        resp.raise_for_status()
+        filename = f"{dex:04d}-{name}{os.path.splitext(urlparse(img_url).path)[-1]}"
+        s3_key = f"{args.prefix}/{filename}"
+
+        if upload_to_s3(args.bucket, s3_key, resp.content):
+            logging.info("Uploaded to s3://%s/%s", args.bucket, s3_key)
 
 if __name__ == "__main__":
     main()
