@@ -68,6 +68,14 @@ def upload_to_s3(bucket, key, data, public=True):
         logging.error("Failed to upload %s: %s", key, e)
         return False
 
+def sanitize_filename(name):
+    """Nettoie le nom pour un usage sûr dans les noms de fichiers."""
+    # Remplace les caractères spéciaux par des tirets
+    name = re.sub(r'[^\w\s-]', '', name)
+    # Remplace les espaces par des tirets
+    name = re.sub(r'[-\s]+', '-', name)
+    return name.strip('-')
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--bucket", required=True, help="Target S3 bucket name")
@@ -90,8 +98,11 @@ def main():
 
         resp = requests.get(img_url)
         resp.raise_for_status()
-        filename = f"{dex:04d}-{name}{os.path.splitext(urlparse(img_url).path)[-1]}"
-        # Force le préfixe "images/" pour respecter la politique AWS
+        
+        # Utilise le nom assaini pour le fichier
+        safe_name = sanitize_filename(name)
+        ext = os.path.splitext(urlparse(img_url).path)[-1] or '.png'
+        filename = f"{dex:04d}-{safe_name}{ext}"
         s3_key = f"images/{filename}"
 
         if upload_to_s3(args.bucket, s3_key, resp.content):
